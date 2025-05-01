@@ -11,6 +11,7 @@ from causallearn.utils.KCI.GaussianKernel import GaussianKernel
 from causallearn.utils.KCI.Kernel import Kernel
 from causallearn.utils.KCI.LinearKernel import LinearKernel
 from causallearn.utils.KCI.PolynomialKernel import PolynomialKernel
+from causallearn.utils.KCI.DiracKernel import DiracKernel
 
 
 # Cannot find reference 'xxx' in '__init__.pyi | __init__.pyi | __init__.pxd' is a bug in pycharm, please ignore
@@ -48,7 +49,6 @@ class KCI_UInd(object):
         kwidthx: kernel width for data x (standard deviation sigma)
         kwidthy: kernel width for data y (standard deviation sigma)
         """
-
         self.kernelX = kernelX
         self.kernelY = kernelY
         self.est_width = est_width
@@ -103,6 +103,14 @@ class KCI_UInd(object):
         Kx: kernel matrix for data_x (nxn)
         Ky: kernel matrix for data_y (nxn)
         """
+        # check if data_x and data_y are binary
+        if ~((data_x!=0) & (data_x!=1)).any():
+            self.kernelX = 'Linear'
+        if ~((data_y!=0) & (data_y!=1)).any():
+            self.kernelY = 'Linear'
+
+
+
         if self.kernelX == 'Gaussian':
             if self.est_width == 'manual':
                 if self.kwidthx is not None:
@@ -121,6 +129,8 @@ class KCI_UInd(object):
             kernelX = PolynomialKernel(self.polyd)
         elif self.kernelX == 'Linear':
             kernelX = LinearKernel()
+        elif self.kernelX == 'Dirac':
+            kernelX = DiracKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -142,6 +152,8 @@ class KCI_UInd(object):
             kernelY = PolynomialKernel(self.polyd)
         elif self.kernelY == 'Linear':
             kernelY = LinearKernel()
+        elif self.kernelY == 'Dirac':
+            kernelY = DiracKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -207,7 +219,7 @@ class KCI_UInd(object):
         null_dstr = lambda_prod.T.dot(f_rand) / T
         return null_dstr
 
-    def get_kappa(self, Kx, Ky):
+    def get_kappa(self, Kx, Ky, epsilon=1e-8):
         """
         Get parameters for the approximated gamma distribution
         Parameters
@@ -228,9 +240,36 @@ class KCI_UInd(object):
         time complexity is reduced from O(n^3) (matrix dot) to O(n^2) (traverse each element),
         where n is usually big (sample size).
         """
+        # T = Kx.shape[0]
+        # mean_appr = np.trace(Kx) * np.trace(Ky) / T
+
+        # epsilon = 1e-8
+        # var_appr = 2 * np.sum(Kx ** 2) * np.sum(Ky ** 2) / (T * T)
+        # var_appr = max(var_appr, epsilon)
+        # k_appr = mean_appr ** 2 / var_appr
+        # theta_appr = var_appr / mean_appr
+        # # var_appr = 2 * np.sum(Kx ** 2) * np.sum(Ky ** 2) / T / T # same as np.sum(Kx * Kx.T) ..., here Kx is symmetric
+        # # k_appr = mean_appr ** 2 / var_appr
+        # # theta_appr = var_appr / mean_appr
+        # return k_appr, theta_appr
+
+
         T = Kx.shape[0]
-        mean_appr = np.trace(Kx) * np.trace(Ky) / T
-        var_appr = 2 * np.sum(Kx ** 2) * np.sum(Ky ** 2) / T / T # same as np.sum(Kx * Kx.T) ..., here Kx is symmetric
+        
+        trace_Kx = np.trace(Kx)
+        trace_Ky = np.trace(Ky)
+        sumsq_Kx = np.sum(Kx ** 2)
+        sumsq_Ky = np.sum(Ky ** 2)
+
+        mean_appr = (trace_Kx * trace_Ky) / T
+        var_appr = (2 * sumsq_Kx * sumsq_Ky) / (T * T)
+
+        # Ensure both mean and variance are large enough to avoid division instability
+        if mean_appr < epsilon or var_appr < epsilon:
+            print(f"[Warning] Degenerate kernel: mean_appr={mean_appr:.2e}, var_appr={var_appr:.2e}")
+            # Return a default weak test distribution (e.g., uniform gamma)
+            return 1.0, 1.0
+
         k_appr = mean_appr ** 2 / var_appr
         theta_appr = var_appr / mean_appr
         return k_appr, theta_appr
@@ -326,15 +365,34 @@ class KCI_CInd(object):
         Kzx: centering kernel matrix for data_x (nxn)
         kzy: centering kernel matrix for data_y (nxn)
         """
+        # check if data_x and data_y are binary
+        if ~((data_x != 0) & (data_x != 1)).any():
+            self.kernelX = 'Linear'
+        else:
+            data_x = stats.zscore(data_x, ddof=1, axis=0)
+            data_x[np.isnan(data_x)] = 0.
+        if ~((data_y != 0) & (data_y != 1)).any():
+            self.kernelY = 'Linear'
+        else: 
+            data_y = stats.zscore(data_y, ddof=1, axis=0)
+            data_y[np.isnan(data_y)] = 0.
+
+        if ~((data_z != 0) & (data_z != 1)).any():
+            self.kernelZ = 'Linear'
+        else:
+            data_z = stats.zscore(data_z, ddof=1, axis=0)
+            data_z[np.isnan(data_z)] = 0.
+        
+        
         # normalize the data
-        data_x = stats.zscore(data_x, ddof=1, axis=0)
-        data_x[np.isnan(data_x)] = 0.
+
+
         
-        data_y = stats.zscore(data_y, ddof=1, axis=0)
-        data_y[np.isnan(data_y)] = 0.
+        # data_y = stats.zscore(data_y, ddof=1, axis=0)
+        # data_y[np.isnan(data_y)] = 0.
         
-        data_z = stats.zscore(data_z, ddof=1, axis=0)
-        data_z[np.isnan(data_z)] = 0.
+        # data_z = stats.zscore(data_z, ddof=1, axis=0)
+        # data_z[np.isnan(data_z)] = 0.
         # We set 'ddof=1' to conform to the normalization way in the original Matlab implementation in
         # http://people.tuebingen.mpg.de/kzhang/KCI-test.zip
 
@@ -361,6 +419,8 @@ class KCI_CInd(object):
             kernelX = PolynomialKernel(self.polyd)
         elif self.kernelX == 'Linear':
             kernelX = LinearKernel()
+        elif self.kernelX == 'Dirac':
+            kernelX = DiracKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -385,6 +445,8 @@ class KCI_CInd(object):
             kernelY = PolynomialKernel(self.polyd)
         elif self.kernelY == 'Linear':
             kernelY = LinearKernel()
+        elif self.kernelY == 'Dirac':
+            kernelY = DiracKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -466,6 +528,11 @@ class KCI_CInd(object):
             Kzy = Kzx
         elif self.kernelZ == 'Linear':
             kernelZ = LinearKernel()
+            Kzx = kernelZ.kernel(data_z)
+            Kzx = Kernel.center_kernel_matrix(Kzx)
+            Kzy = Kzx
+        elif self.kernelZ == 'Dirac':
+            kernelZ = DiracKernel()
             Kzx = kernelZ.kernel(data_z)
             Kzx = Kernel.center_kernel_matrix(Kzx)
             Kzy = Kzx
