@@ -11,7 +11,6 @@ from causallearn.utils.KCI.GaussianKernel import GaussianKernel
 from causallearn.utils.KCI.Kernel import Kernel
 from causallearn.utils.KCI.LinearKernel import LinearKernel
 from causallearn.utils.KCI.PolynomialKernel import PolynomialKernel
-from causallearn.utils.KCI.DiracKernel import DiracKernel
 
 
 # Cannot find reference 'xxx' in '__init__.pyi | __init__.pyi | __init__.pxd' is a bug in pycharm, please ignore
@@ -129,8 +128,6 @@ class KCI_UInd(object):
             kernelX = PolynomialKernel(self.polyd)
         elif self.kernelX == 'Linear':
             kernelX = LinearKernel()
-        elif self.kernelX == 'Dirac':
-            kernelX = DiracKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -152,8 +149,6 @@ class KCI_UInd(object):
             kernelY = PolynomialKernel(self.polyd)
         elif self.kernelY == 'Linear':
             kernelY = LinearKernel()
-        elif self.kernelY == 'Dirac':
-            kernelY = DiracKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -371,6 +366,7 @@ class KCI_CInd(object):
         else:
             data_x = stats.zscore(data_x, ddof=1, axis=0)
             data_x[np.isnan(data_x)] = 0.
+
         if ~((data_y != 0) & (data_y != 1)).any():
             self.kernelY = 'Linear'
         else: 
@@ -419,8 +415,6 @@ class KCI_CInd(object):
             kernelX = PolynomialKernel(self.polyd)
         elif self.kernelX == 'Linear':
             kernelX = LinearKernel()
-        elif self.kernelX == 'Dirac':
-            kernelX = DiracKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -445,8 +439,6 @@ class KCI_CInd(object):
             kernelY = PolynomialKernel(self.polyd)
         elif self.kernelY == 'Linear':
             kernelY = LinearKernel()
-        elif self.kernelY == 'Dirac':
-            kernelY = DiracKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -528,11 +520,6 @@ class KCI_CInd(object):
             Kzy = Kzx
         elif self.kernelZ == 'Linear':
             kernelZ = LinearKernel()
-            Kzx = kernelZ.kernel(data_z)
-            Kzx = Kernel.center_kernel_matrix(Kzx)
-            Kzy = Kzx
-        elif self.kernelZ == 'Dirac':
-            kernelZ = DiracKernel()
             Kzx = kernelZ.kernel(data_z)
             Kzx = Kernel.center_kernel_matrix(Kzx)
             Kzy = Kzx
