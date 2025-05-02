@@ -11,6 +11,7 @@ from causallearn.utils.KCI.GaussianKernel import GaussianKernel
 from causallearn.utils.KCI.Kernel import Kernel
 from causallearn.utils.KCI.LinearKernel import LinearKernel
 from causallearn.utils.KCI.PolynomialKernel import PolynomialKernel
+from causallearn.utils.KCI.OverlapKernel import OverlapKernel
 
 
 # Cannot find reference 'xxx' in '__init__.pyi | __init__.pyi | __init__.pxd' is a bug in pycharm, please ignore
@@ -104,9 +105,9 @@ class KCI_UInd(object):
         """
         # check if data_x and data_y are binary
         if ~((data_x!=0) & (data_x!=1)).any():
-            self.kernelX = 'Linear'
+            self.kernelX = 'Overlap'
         if ~((data_y!=0) & (data_y!=1)).any():
-            self.kernelY = 'Linear'
+            self.kernelY = 'Overlap'
 
 
 
@@ -128,6 +129,8 @@ class KCI_UInd(object):
             kernelX = PolynomialKernel(self.polyd)
         elif self.kernelX == 'Linear':
             kernelX = LinearKernel()
+        elif self.kernelX == 'Overlap':
+            kernelX = OverlapKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -149,6 +152,8 @@ class KCI_UInd(object):
             kernelY = PolynomialKernel(self.polyd)
         elif self.kernelY == 'Linear':
             kernelY = LinearKernel()
+        elif self.kernelY == 'Overlap':
+            kernelY = OverlapKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -337,19 +342,22 @@ class KCI_CInd(object):
         """
         # check if data_x and data_y are binary and normalize data
         if ~((data_x != 0) & (data_x != 1)).any():
-            self.kernelX = 'Linear'
+            self.kernelX = 'Overlap'
+            data_x[np.isnan(data_x)] = 0.
         else:
             data_x = stats.zscore(data_x, ddof=1, axis=0)
             data_x[np.isnan(data_x)] = 0.
 
         if ~((data_y != 0) & (data_y != 1)).any():
-            self.kernelY = 'Linear'
+            self.kernelY = 'Overlap'
+            data_x[np.isnan(data_x)] = 0.
         else: 
             data_y = stats.zscore(data_y, ddof=1, axis=0)
             data_y[np.isnan(data_y)] = 0.
 
         if ~((data_z != 0) & (data_z != 1)).any():
-            self.kernelZ = 'Linear'
+            self.kernelZ = 'Overlap'
+            data_x[np.isnan(data_x)] = 0.
         else:
             data_z = stats.zscore(data_z, ddof=1, axis=0)
             data_z[np.isnan(data_z)] = 0.
@@ -380,6 +388,8 @@ class KCI_CInd(object):
             kernelX = PolynomialKernel(self.polyd)
         elif self.kernelX == 'Linear':
             kernelX = LinearKernel()
+        elif self.kernelX == 'Overlap':
+            kernelX = OverlapKernel()
         else:
             raise Exception('Undefined kernel function')
 
@@ -404,8 +414,12 @@ class KCI_CInd(object):
             kernelY = PolynomialKernel(self.polyd)
         elif self.kernelY == 'Linear':
             kernelY = LinearKernel()
+        elif self.kernelY == 'Overlap':
+            kernelY = OverlapKernel()
         else:
             raise Exception('Undefined kernel function')
+        
+        data_x, data_y, data_z = self.align_data(data_x, data_y, data_z)
 
         Kx = kernelX.kernel(data_x)
         Ky = kernelY.kernel(data_y)
@@ -488,9 +502,23 @@ class KCI_CInd(object):
             Kzx = kernelZ.kernel(data_z)
             Kzx = Kernel.center_kernel_matrix(Kzx)
             Kzy = Kzx
+        elif self.kernelZ == 'Overlap':
+            kernelZ = OverlapKernel()
+            Kzx = kernelZ.kernel(data_z)
+            Kzx = Kernel.center_kernel_matrix(Kzx)
+            Kzy = Kzx
         else:
             raise Exception('Undefined kernel function')
         return Kx, Ky, Kzx, Kzy
+    
+    def align_data(self, data_x, data_y, data_z):
+        mask = (
+            ~np.isnan(data_x).any(axis=1) &
+            ~np.isnan(data_y).any(axis=1) &
+            ~np.isnan(data_z).any(axis=1)
+        )
+        return data_x[mask], data_y[mask], data_z[mask]
+
 
     def KCI_V_statistic(self, Kx, Ky, Kzx, Kzy):
         """
@@ -518,6 +546,10 @@ class KCI_CInd(object):
         2. If not (self.kernelZ == 'Gaussian' and self.use_gp): assert (Kzx == Kzy).all()
            With this we could save one repeated calculation of pinv(Kzy+\epsilonI), which consumes most time.
         """
+        print('Kx.shape:', Kx.shape)
+        print('Ky.shape:', Ky.shape)
+        print('Kzx.shape:', Kzx.shape)
+        print('Kzy.shape:', Kzy.shape)
         KxR, Rzx = Kernel.center_kernel_matrix_regression(Kx, Kzx, self.epsilon_x)
         if self.epsilon_x != self.epsilon_y or (self.kernelZ == 'Gaussian' and self.use_gp):
             KyR, _ = Kernel.center_kernel_matrix_regression(Ky, Kzy, self.epsilon_y)

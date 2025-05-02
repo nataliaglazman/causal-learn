@@ -44,6 +44,6 @@ class Kernel(object):
         """
         Centers the kernel matrix via a centering matrix R=I-Kz(Kz+\epsilonI)^{-1} and returns RKR
         """
-        n = shape(K)[0]
+        n = shape(Kz)[0]
         Rz = epsilon * pinv(Kz + epsilon * eye(n))
         return Rz.dot(K.dot(Rz)), Rz
