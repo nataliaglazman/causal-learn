@@ -214,7 +214,7 @@ class KCI_UInd(object):
         null_dstr = lambda_prod.T.dot(f_rand) / T
         return null_dstr
 
-    def get_kappa(self, Kx, Ky, epsilon=1e-8):
+    def get_kappa(self, Kx, Ky):
         """
         Get parameters for the approximated gamma distribution
         Parameters
@@ -335,7 +335,7 @@ class KCI_CInd(object):
         Kzx: centering kernel matrix for data_x (nxn)
         kzy: centering kernel matrix for data_y (nxn)
         """
-        # check if data_x and data_y are binary and normalize
+        # check if data_x and data_y are binary and normalize data
         if ~((data_x != 0) & (data_x != 1)).any():
             self.kernelX = 'Linear'
         else:
