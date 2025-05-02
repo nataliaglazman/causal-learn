@@ -335,7 +335,7 @@ class KCI_CInd(object):
         Kzx: centering kernel matrix for data_x (nxn)
         kzy: centering kernel matrix for data_y (nxn)
         """
-        # check if data_x and data_y are binary
+        # check if data_x and data_y are binary and normalize
         if ~((data_x != 0) & (data_x != 1)).any():
             self.kernelX = 'Linear'
         else:
@@ -354,16 +354,6 @@ class KCI_CInd(object):
             data_z = stats.zscore(data_z, ddof=1, axis=0)
             data_z[np.isnan(data_z)] = 0.
         
-        
-        # normalize the data
-
-
-        
-        # data_y = stats.zscore(data_y, ddof=1, axis=0)
-        # data_y[np.isnan(data_y)] = 0.
-        
-        # data_z = stats.zscore(data_z, ddof=1, axis=0)
-        # data_z[np.isnan(data_z)] = 0.
         # We set 'ddof=1' to conform to the normalization way in the original Matlab implementation in
         # http://people.tuebingen.mpg.de/kzhang/KCI-test.zip
 
