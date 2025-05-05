@@ -21,6 +21,7 @@ fastkci = "fastkci"
 chisq = "chisq"
 gsq = "gsq"
 d_separation = "d_separation"
+mv_kci = "mv_kci"
 
 # Registry for custom CI tests
 _custom_ci_tests = {}
@@ -79,6 +80,8 @@ def CIT(data, method='fisherz', **kwargs):
         return MC_FisherZ(data, **kwargs)
     elif method == d_separation:
         return D_Separation(data, **kwargs)
+    elif method == mv_kci:
+        return MV_KCI(data, **kwargs)
     else:
         raise ValueError(f"Unknown method: {method}. If using a custom CI test, make sure it's registered with register_ci_test()")
 
@@ -487,6 +490,50 @@ class MV_FisherZ(CIT_Base):
         p = 2 * (1 - norm.cdf(abs(X)))
         self.pvalue_cache[cache_key] = p
         return p
+    
+
+
+    
+class MV_KCI(CIT_Base):
+    def __init__(self, data, **kwargs):
+        super().__init__(data, **kwargs)
+        kci_ui_kwargs = {k: v for k, v in kwargs.items() if k in
+                         ['kernelX', 'kernelY', 'null_ss', 'approx', 'est_width', 'polyd', 'kwidthx', 'kwidthy']}
+        kci_ci_kwargs = {k: v for k, v in kwargs.items() if k in
+                         ['kernelX', 'kernelY', 'kernelZ', 'null_ss', 'approx', 'use_gp', 'est_width', 'polyd',
+                          'kwidthx', 'kwidthy', 'kwidthz']}
+        self.check_cache_method_consistent(
+            'mv_kci', hashlib.md5(json.dumps(kci_ci_kwargs, sort_keys=True).encode('utf-8')).hexdigest())
+        # self.assert_input_data_is_valid()
+        self.kci_ui = KCI_UInd(**kci_ui_kwargs)
+        self.kci_ci = KCI_CInd(**kci_ci_kwargs)
+    
+    def _get_index_no_mv_rows(self, mvdata):
+        nrow, ncol = np.shape(mvdata)
+        bindxRows = np.ones((nrow,), dtype=bool)
+        indxRows = np.array(list(range(nrow)))
+        for i in range(ncol):
+            bindxRows = np.logical_and(bindxRows, ~np.isnan(mvdata[:, i]))
+        indxRows = indxRows[bindxRows]
+        return indxRows
+
+    def __call__(self, X, Y, condition_set=None):
+        # Kernel-based conditional independence test.
+
+        Xs, Ys, condition_set, cache_key = self.get_formatted_XYZ_and_cachekey(X, Y, condition_set)
+        if cache_key in self.pvalue_cache: return self.pvalue_cache[cache_key]
+        var = Xs + Ys + condition_set
+        test_wise_deletion_XYcond_rows_index = self._get_index_no_mv_rows(self.data[:, var])
+        assert len(test_wise_deletion_XYcond_rows_index) != 0, \
+            "A test-wise deletion fisher-z test appears no overlapping data of involved variables. Please check the input data."
+        test_wise_deleted_data_var = self.data[test_wise_deletion_XYcond_rows_index]
+        p = self.kci_ui.compute_pvalue(test_wise_deleted_data_var[:, Xs], test_wise_deleted_data_var[:, Ys])[0] if len(condition_set) == 0 else \
+            self.kci_ci.compute_pvalue(test_wise_deleted_data_var[:, Xs], test_wise_deleted_data_var[:, Ys], test_wise_deleted_data_var[:, condition_set])[0]
+        self.pvalue_cache[cache_key] = p
+        return p
+    
+
+
 
 class MC_FisherZ(CIT_Base):
     def __init__(self, data, **kwargs):

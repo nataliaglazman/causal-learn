@@ -5,6 +5,7 @@ import numpy as np
 from numpy import ndarray
 
 from causallearn.utils.KCI.Kernel import Kernel
+from scipy.spatial.distance import pdist, squareform
 
 
 
@@ -24,12 +25,13 @@ class OverlapKernel(Kernel):
         - K: Kernel matrix of shape (n_samples, n_samples)
         """
         #.reshape(-1, 1)
-        X = np.asarray(X).reshape(-1, 1)  # ensure column vector
+        print('using overlap kernel')
+        X = np.asarray(X)
         if Y is None:
             Y = X
         else:
             Y = np.asarray(Y)
-        print(X.shape, Y.shape)
-        result = (X == Y.T).astype(float)
+        # result = (X == Y.T).astype(float)
+        result = squareform(pdist(X, 'jaccard'))
     
         return result

@@ -272,6 +272,7 @@ def get_parent_missingness_pairs(data: ndarray, alpha: float, indep_test, stable
     ## Get the index of parents of missingness indicators
     # If the missingness indicator has no parent, then it will not be collected in prt_m
     for missingness_i in missingness_index:
+        
         parent_of_missingness_i = detect_parent(missingness_i, data, alpha, indep_test, stable)
         if not isempty(parent_of_missingness_i):
             parent_missingness_pairs['prt'].append(parent_of_missingness_i)
