@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Root directory containing subject subfolders
+root_dir="/downloads/disc3"
+
+# Output directory for extracted segmentations
+output_dir="/downloads/segmentations"
+mkdir -p "$output_dir"
+
+# Find and copy each aparc+aseg.mgz file
+find "$root_dir" -type f -name "aparc+aseg.mgz" | while read -r filepath; do
+    # Extract the subject ID (e.g., OAS1_0106_MR1)
+    subject=$(echo "$filepath" | grep -oP "OAS1_\d+_MR\d+")
+
+    # Define destination path
+    dest_path="$output_dir/${subject}.mgz"
+
+    echo "Copying $filepath to $dest_path"
+    cp "$filepath" "$dest_path"
+done

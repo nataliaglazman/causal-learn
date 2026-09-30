@@ -106,8 +106,16 @@ class KCI_UInd(object):
         # check if data_x and data_y are binary
         if ~((data_x!=0) & (data_x!=1)).any():
             self.kernelX = 'Gaussian'
+        else:
+            self.kernelX = 'Gaussian'
+            data_x = stats.zscore(data_x, ddof=1, axis=0)
+            data_x[np.isnan(data_x)] = 0.
         if ~((data_y!=0) & (data_y!=1)).any():
             self.kernelY = 'Gaussian'
+        else:
+            self.kernelY = 'Gaussian'
+            data_y = stats.zscore(data_y, ddof=1, axis=0)
+            data_y[np.isnan(data_y)] = 0.
 
 
 
@@ -342,10 +350,8 @@ class KCI_CInd(object):
         """
         # check if data_x and data_y are binary and normalize data
         if ~((data_x != 0) & (data_x != 1)).any():
-
             self.kernelX = 'Gaussian'
             data_x[np.isnan(data_x)] = 0.
-
         else:
             self.kernelX = 'Gaussian'
             data_x = stats.zscore(data_x, ddof=1, axis=0)
@@ -447,6 +453,8 @@ class KCI_CInd(object):
                     elif self.est_width == 'empirical':
                         kernelZ.set_width_empirical_kci(data_z)
                 Kzx = kernelZ.kernel(data_z)
+                print("Condition number:", np.linalg.cond(Kz))
+                print("Rank:", np.linalg.matrix_rank(Kz))
                 Kzx = Kernel.center_kernel_matrix(Kzx)
                 # centering kernel matrix to conform with the original Matlab implementation,
                 # specifically, Line 100 in the file 'algorithms/CInd_test_new_withGP.m'
@@ -551,10 +559,6 @@ class KCI_CInd(object):
         2. If not (self.kernelZ == 'Gaussian' and self.use_gp): assert (Kzx == Kzy).all()
            With this we could save one repeated calculation of pinv(Kzy+\epsilonI), which consumes most time.
         """
-        # print('Kx.shape:', Kx.shape)
-        # print('Ky.shape:', Ky.shape)
-        # print('Kzx.shape:', Kzx.shape)
-        # print('Kzy.shape:', Kzy.shape)
         KxR, Rzx = Kernel.center_kernel_matrix_regression(Kx, Kzx, self.epsilon_x)
         if self.epsilon_x != self.epsilon_y or (self.kernelZ == 'Gaussian' and self.use_gp):
             KyR, _ = Kernel.center_kernel_matrix_regression(Ky, Kzy, self.epsilon_y)

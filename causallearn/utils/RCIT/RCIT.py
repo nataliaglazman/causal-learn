@@ -61,6 +61,19 @@ class RCIT(object):
         r = data_x.shape[0]
         r1 = 500 if (r > 500) else r
 
+        if np.all((data_x == 0.0) | (data_x == 1.0)):
+            binary_x = True
+        else:
+            binary_x = False
+        if np.all((data_y == 0.0) | (data_y == 1.0)):
+            binary_y = True
+        else:
+            binary_y = False
+        if np.all((data_z == 0.0) | (data_z == 1.0)):
+            binary_z = True
+        else:
+            binary_z = False
+
         data_x = (data_x - data_x.mean(axis=0)) / data_x.std(axis=0, ddof=1)
         data_y = (data_y - data_y.mean(axis=0)) / data_y.std(axis=0, ddof=1)
         data_z = (data_z - data_z.mean(axis=0)) / data_z.std(axis=0, ddof=1)
@@ -69,11 +82,48 @@ class RCIT(object):
             data_y = np.column_stack((data_y, data_z))
 
         sigma = dict()
-        for key, value in [("x", data_x), ("y", data_y), ("z", data_z)]:
-            distances = pdist(value[:r1, :], metric='euclidean')
-            flattened_distances = squareform(distances).ravel()
-            non_zero_distances = flattened_distances[flattened_distances != 0]
-            sigma[key] = np.median(non_zero_distances)
+
+        if binary_x:
+            for key, value in [("x", data_x)]:
+                sigma[key] = 0.001
+                print(f"median {key}: {sigma[key]}")
+        else:
+            for key, value in [("x", data_x)]:
+                distances = pdist(value[:r1, :], metric='euclidean')
+                flattened_distances = squareform(distances).ravel()
+                non_zero_distances = flattened_distances[flattened_distances != 0]
+                sigma[key] = np.median(non_zero_distances)
+
+        if binary_y:
+            for key, value in [("y", data_y)]:
+                sigma[key] = 0.001
+                print(f"median {key}: {sigma[key]}")
+        else:
+            for key, value in [("y", data_y)]:
+                distances = pdist(value[:r1, :], metric='euclidean')
+                flattened_distances = squareform(distances).ravel()
+                non_zero_distances = flattened_distances[flattened_distances != 0]
+                sigma[key] = np.median(non_zero_distances)
+        if binary_z:
+            for key, value in [("z", data_z)]:
+                sigma[key] = 0.001
+                print(f"median {key}: {sigma[key]}")
+        else:
+            for key, value in [("z", data_z)]:
+                distances = pdist(value[:r1, :], metric='euclidean')
+                flattened_distances = squareform(distances).ravel()
+                non_zero_distances = flattened_distances[flattened_distances != 0]
+                sigma[key] = np.median(non_zero_distances)
+
+        # for key, value in [("x", data_x), ("y", data_y), ("z", data_z)]:
+        #     distances = pdist(value[:r1, :], metric='euclidean')
+        #     flattened_distances = squareform(distances).ravel()
+        #     non_zero_distances = flattened_distances[flattened_distances != 0]
+        #     sigma[key] = np.median(non_zero_distances)
+        #     print(f"median {key}: {sigma[key]}")
+        # print(f"median x: {sigma['x']}")
+        # print(f"median y: {sigma['y']}")
+        # print(f"median z: {sigma['z']}")
 
         four_z = self.random_fourier_features(data_z, num_f=self.num_f, sigma=sigma["z"])
         four_x = self.random_fourier_features(data_x, num_f=self.num_f2, sigma=sigma["x"])

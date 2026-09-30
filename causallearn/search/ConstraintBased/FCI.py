@@ -1130,3 +1130,125 @@ def fci(dataset: ndarray, independence_test_method: str=fisherz, alpha: float = 
     edges = get_color_edges(graph)
 
     return graph, edges
+
+def testwisefci(dataset: ndarray, independence_test_method: str=fisherz, alpha: float = 0.05, depth: int = -1,
+        max_path_length: int = -1, verbose: bool = False, background_knowledge: BackgroundKnowledge | None = None, 
+        show_progress: bool = True, node_names = None,
+        **kwargs) -> Tuple[Graph, List[Edge]]:
+    """
+    Perform Fast Causal Inference (FCI) algorithm for causal discovery
+
+    Parameters
+    ----------
+    dataset: data set (numpy ndarray), shape (n_samples, n_features). The input data, where n_samples is the number of
+            samples and n_features is the number of features.
+    independence_test_method: str, name of the function of the independence test being used
+            [fisherz, chisq, gsq, kci]
+           - fisherz: Fisher's Z conditional independence test
+           - chisq: Chi-squared conditional independence test
+           - gsq: G-squared conditional independence test
+           - kci: Kernel-based conditional independence test
+    alpha: float, desired significance level of independence tests (p_value) in (0,1)
+    depth: The depth for the fast adjacency search, or -1 if unlimited
+    max_path_length: the maximum length of any discriminating path, or -1 if unlimited.
+    verbose: True is verbose output should be printed or logged
+    background_knowledge: background knowledge
+
+    Returns
+    -------
+    graph : a GeneralGraph object, where graph.graph[j,i]=1 and graph.graph[i,j]=-1 indicates  i --> j ,
+                    graph.graph[i,j] = graph.graph[j,i] = -1 indicates i --- j,
+                    graph.graph[i,j] = graph.graph[j,i] = 1 indicates i <-> j,
+                    graph.graph[j,i]=1 and graph.graph[i,j]=2 indicates  i o-> j.
+    edges : list
+        Contains graph's edges properties.
+        If edge.properties have the Property 'nl', then there is no latent confounder. Otherwise,
+            there are possibly latent confounders.
+        If edge.properties have the Property 'dd', then it is definitely direct. Otherwise,
+            it is possibly direct.
+        If edge.properties have the Property 'pl', then there are possibly latent confounders. Otherwise,
+            there is no latent confounder.
+        If edge.properties have the Property 'pd', then it is possibly direct. Otherwise,
+            it is definitely direct.
+    """
+
+    if dataset.shape[0] < dataset.shape[1]:
+        warnings.warn("The number of features is much larger than the sample size!")
+
+    independence_test_method = CIT(dataset, method=independence_test_method, **kwargs)
+
+    ## ------- check parameters ------------
+    if (depth is None) or type(depth) != int:
+        raise TypeError("'depth' must be 'int' type!")
+    if (background_knowledge is not None) and type(background_knowledge) != BackgroundKnowledge:
+        raise TypeError("'background_knowledge' must be 'BackgroundKnowledge' type!")
+    if type(max_path_length) != int:
+        raise TypeError("'max_path_length' must be 'int' type!")
+    ## ------- end check parameters ------------
+
+
+    nodes = []
+    if node_names is None:
+        node_names = [f"X{i + 1}" for i in range(dataset.shape[1])]
+    for i in range(dataset.shape[1]):
+        node = GraphNode(node_names[i])
+        node.add_attribute("id", i)
+        nodes.append(node)
+
+    # FAS (“Fast Adjacency Search”) is the adjacency search of the PC algorithm, used as a first step for the FCI algorithm.
+    graph, sep_sets, test_results = fas(dataset, nodes, independence_test_method=independence_test_method, alpha=alpha,
+                                        knowledge=background_knowledge, depth=depth, verbose=verbose, show_progress=show_progress)
+
+    # pdb.set_trace()
+    reorientAllWith(graph, Endpoint.CIRCLE)
+
+    rule0(graph, nodes, sep_sets, background_knowledge, verbose)
+
+    removeByPossibleDsep(graph, independence_test_method, alpha, sep_sets)
+
+    reorientAllWith(graph, Endpoint.CIRCLE)
+    rule0(graph, nodes, sep_sets, background_knowledge, verbose)
+
+    change_flag = True
+    first_time = True
+
+    while change_flag:
+        change_flag = False
+        change_flag = rulesR1R2cycle(graph, background_knowledge, change_flag, verbose)
+        change_flag = ruleR3(graph, sep_sets, background_knowledge, change_flag, verbose)
+
+        if change_flag or (first_time and background_knowledge is not None and
+                           len(background_knowledge.forbidden_rules_specs) > 0 and
+                           len(background_knowledge.required_rules_specs) > 0 and
+                           len(background_knowledge.tier_map.keys()) > 0):
+            change_flag = ruleR4B(graph, max_path_length, dataset, independence_test_method, alpha, sep_sets,
+                                  change_flag,
+                                  background_knowledge, verbose)
+
+            first_time = False
+
+            if verbose:
+                print("Epoch")
+
+        # rule 5
+        change_flag = ruleR5(graph, change_flag, verbose)
+        
+        # rule 6
+        change_flag = ruleR6(graph, change_flag, verbose)
+        
+        # rule 7
+        change_flag = ruleR7(graph, change_flag, verbose)
+        
+        # rule 8
+        change_flag = rule8(graph,nodes, change_flag)
+        
+        # rule 9
+        change_flag = rule9(graph, nodes, change_flag)
+        # rule 10
+        change_flag = rule10(graph, change_flag)
+
+    graph.set_pag(True)
+
+    edges = get_color_edges(graph)
+
+    return graph, edges
